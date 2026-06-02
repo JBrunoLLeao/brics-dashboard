@@ -4,9 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-# ──────────────────────────────────────────────────
-# CONFIG
-# ──────────────────────────────────────────────────
+
 st.set_page_config(
     page_title="BRICS+ Trade Dashboard",
     page_icon="🌐",
@@ -20,11 +18,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────
-# DATA LOADING
-# ──────────────────────────────────────────────────
+# algumas correções para leitura dos dados (vírgula sobrando no final de cada linha de dados no csv, fazendo o pandas achar que há 48 colunas quando o cabeçalho tem 47. Isso desloca todos os nomes de colunas em uma posição)
 def fix_csv(path: str) -> pd.DataFrame:
-    """Strip trailing commas caused by UN Comtrade export format."""
+
     with open(path, encoding="utf-8") as f:
         content = f.read()
     lines = content.replace("\r\n", "\n").split("\n")
@@ -38,7 +34,7 @@ def load_data():
     hs2   = fix_csv("trade_hs2.csv")
 
     for df in (total, hs2):
-        # trade value: CIF for imports, FOB for exports
+        # comércio: CIF pra importação, FOB pra exportação
         df["trade_value"] = df.apply(
             lambda r: r["cifvalue"] if r["flowCode"] == "M" else r["fobvalue"],
             axis=1,
@@ -53,9 +49,6 @@ total, hs2 = load_data()
 BRICS_PARTNERS = sorted(total["partnerDesc"].dropna().unique())
 YEARS = sorted(total["refYear"].dropna().unique().astype(int))
 
-# ──────────────────────────────────────────────────
-# SIDEBAR NAVIGATION
-# ──────────────────────────────────────────────────
 page = st.sidebar.radio(
     "📌 Navegação",
     [
@@ -70,14 +63,12 @@ st.sidebar.divider()
 st.sidebar.caption("Fonte: UN Comtrade | Países BRICS+")
 st.sidebar.caption(f"Período: {YEARS[0]}–{YEARS[-1]}")
 
-# ══════════════════════════════════════════════════
 # PAGE 1 – VISÃO GERAL
-# ══════════════════════════════════════════════════
 if page == "🌍 Visão Geral":
     st.title("🌍 Comércio Internacional – Brasil & BRICS+")
     st.caption("Dados de exportações e importações do Brasil com os parceiros do BRICS ampliado.")
 
-    # ── KPIs ──────────────────────────────────────
+    # total de importações, exportações e saldo
     exp_total = total[total["flowCode"] == "X"]["trade_value"].sum()
     imp_total = total[total["flowCode"] == "M"]["trade_value"].sum()
     balance   = exp_total - imp_total
@@ -94,7 +85,7 @@ if page == "🌍 Visão Geral":
 
     st.divider()
 
-    # ── Evolução temporal ─────────────────────────
+    # Evolução temporal -> Análise das exportações/importações por ano
     trade_year = (
         total.groupby(["refYear", "flowCode"])["trade_value"]
         .sum()
@@ -116,7 +107,7 @@ if page == "🌍 Visão Geral":
     fig_line.update_layout(legend_title_text="")
     st.plotly_chart(fig_line, use_container_width=True)
 
-    # ── Ranking de parceiros ──────────────────────
+    # Ranking de parceiros 
     st.subheader("🏆 Principais Parceiros Comerciais")
 
     col_a, col_b = st.columns(2)
@@ -165,7 +156,7 @@ if page == "🌍 Visão Geral":
         fig_imp.update_coloraxes(showscale=False)
         st.plotly_chart(fig_imp, use_container_width=True)
 
-    # ── Participação no comércio do bloco ─────────
+    # Participação no comércio do bloco
     st.subheader("📈 Participação no Comércio do Bloco")
     share = (
         total.groupby("partnerDesc")["trade_value"]
@@ -185,7 +176,7 @@ if page == "🌍 Visão Geral":
     fig_pie.update_traces(textposition="inside", textinfo="percent+label")
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # ── Crescimento médio anual ───────────────────
+    # Crescimento médio anual --> crescimento anual via fórmula do CAGR (Compound Annual Growth Rate)
     st.subheader("📉 Crescimento Médio Anual por Parceiro")
     growth_data = []
     for partner in BRICS_PARTNERS:
@@ -199,7 +190,7 @@ if page == "🌍 Visão Geral":
         if len(df_p) >= 2:
             v0, vn = df_p["trade_value"].iloc[0], df_p["trade_value"].iloc[-1]
             n = len(df_p) - 1
-            cagr = ((vn / v0) ** (1 / n) - 1) * 100 if v0 > 0 else 0
+            cagr = ((vn / v0) ** (1 / n) - 1) * 100 if v0 > 0 else 0 # fórmula CAGR
             growth_data.append({"Parceiro": partner, "CAGR (%)": round(cagr, 1)})
     df_cagr = pd.DataFrame(growth_data).sort_values("CAGR (%)", ascending=True)
     fig_cagr = px.bar(
@@ -215,9 +206,9 @@ if page == "🌍 Visão Geral":
     st.plotly_chart(fig_cagr, use_container_width=True)
 
 
-# ══════════════════════════════════════════════════
+
 # PAGE 2 – ESTRUTURA DA PAUTA
-# ══════════════════════════════════════════════════
+
 elif page == "📦 Estrutura da Pauta":
     st.title("📦 Estrutura da Pauta Comercial por Produto (HS2)")
 
@@ -315,10 +306,8 @@ elif page == "📦 Estrutura da Pauta":
         )
         st.caption(f"Concentração **{level}** da pauta de {flow_sel.lower()}.")
 
-
-# ══════════════════════════════════════════════════
 # PAGE 3 – FLUXOS BILATERAIS
-# ══════════════════════════════════════════════════
+
 elif page == "🔄 Fluxos Bilaterais":
     st.title("🔄 Fluxos Bilaterais")
     st.caption("Analise o comércio entre o Brasil e um parceiro específico do BRICS+.")
@@ -455,9 +444,9 @@ elif page == "🔄 Fluxos Bilaterais":
         st.plotly_chart(fig_stack, use_container_width=True)
 
 
-# ══════════════════════════════════════════════════
+
 # PAGE 4 – INDICADORES DE COMPETITIVIDADE
-# ══════════════════════════════════════════════════
+
 elif page == "📊 Indicadores de Competitividade":
     st.title("📊 Indicadores de Competitividade")
     st.caption("Market Share (MS), Vantagem Comparativa Revelada (VCR) e Índice de Comércio Intra-Industrial (ICII).")
@@ -472,7 +461,7 @@ elif page == "📊 Indicadores de Competitividade":
     else:
         df_year_p = df_year.copy()
 
-    # ── Market Share ──────────────────────────────
+    # Market Share 
     st.subheader("📌 Market Share (MS)")
     st.latex(r"MS_{ik} = \frac{X_{ik}}{X_k}")
     st.caption("Participação do Brasil nas exportações de cada produto para o(s) parceiro(s) selecionado(s).")
@@ -505,7 +494,7 @@ elif page == "📊 Indicadores de Competitividade":
         fig_ms.update_layout(yaxis={"categoryorder": "total ascending"})
         st.plotly_chart(fig_ms, use_container_width=True)
 
-    # ── VCR ──────────────────────────────────────
+    #  VCR 
     st.divider()
     st.subheader("📌 Vantagem Comparativa Revelada (VCR – Balassa)")
     st.latex(r"VCR = \frac{X_{ik}/X_i}{X_k/X}")
@@ -555,7 +544,7 @@ elif page == "📊 Indicadores de Competitividade":
         fig_vcr.update_layout(yaxis={"categoryorder": "total ascending"})
         st.plotly_chart(fig_vcr, use_container_width=True)
 
-    # ── ICII ──────────────────────────────────────
+    # ICII 
     st.divider()
     st.subheader("📌 Índice de Comércio Intra-Industrial (ICII)")
     st.latex(r"ICII = \left(1 - \frac{|X_k - M_k|}{X_k + M_k}\right) \times 100")
