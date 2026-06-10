@@ -544,11 +544,19 @@ elif page == "📊 Indicadores de Competitividade":
         fig_vcr.update_layout(yaxis={"categoryorder": "total ascending"})
         st.plotly_chart(fig_vcr, use_container_width=True)
 
-    # ICII 
+    # ICII
     st.divider()
     st.subheader("📌 Índice de Comércio Intra-Industrial (ICII)")
-    st.latex(r"ICII = \left(1 - \frac{|X_k - M_k|}{X_k + M_k}\right) \times 100")
-    st.caption("ICII próximo de 100: comércio muito integrado (intra-industrial). Próximo de 0: especialização inter-industrial.")
+
+    st.latex(
+        r"ICII_i = \left(1 - \frac{|X_i - M_i|}{X_i + M_i}\right)\times100"
+    )
+
+    st.caption(
+        "O gráfico mostra os produtos com maior integração intra-industrial. "
+        "A métrica agregada abaixo responde à pergunta: "
+        "'Qual o grau de comércio intraindustrial entre o Brasil e o parceiro selecionado?'"
+    )
 
     exp_p = (
         df_year_p[df_year_p["flowCode"] == "X"]
@@ -556,44 +564,128 @@ elif page == "📊 Indicadores de Competitividade":
         .sum()
         .rename("Xk")
     )
+
     imp_p = (
         df_year_p[df_year_p["flowCode"] == "M"]
         .groupby("cmdDesc")["trade_value"]
         .sum()
         .rename("Mk")
     )
-    icii_df = pd.concat([exp_p, imp_p], axis=1).fillna(0).reset_index()
-    icii_df = icii_df[(icii_df["Xk"] + icii_df["Mk"]) > 0]
-    icii_df["ICII"] = (
-        1 - abs(icii_df["Xk"] - icii_df["Mk"]) / (icii_df["Xk"] + icii_df["Mk"])
-    ) * 100
-    icii_df = icii_df.sort_values("ICII", ascending=False).head(20)
 
-    if not icii_df.empty:
+    icii_df = (
+        pd.concat([exp_p, imp_p], axis=1)
+        .fillna(0)
+        .reset_index()
+    )
+
+    icii_df = icii_df[(icii_df["Xk"] + icii_df["Mk"]) > 0]
+
+    icii_df["ICII"] = (
+        1 - abs(icii_df["Xk"] - icii_df["Mk"])
+        / (icii_df["Xk"] + icii_df["Mk"])
+    ) * 100
+
+    numerador = (
+        (icii_df["Xk"] + icii_df["Mk"]).sum()
+        - abs(icii_df["Xk"] - icii_df["Mk"]).sum()
+    )
+
+    denominador = (
+        icii_df["Xk"] + icii_df["Mk"]
+    ).sum()
+
+    icii_agregado = (
+        100 * numerador / denominador
+        if denominador > 0
+        else 0
+    )
+
+    if icii_agregado >= 60:
+        nivel = "Alta"
+        emoji = "🟢"
+    elif icii_agregado >= 30:
+        nivel = "Moderada"
+        emoji = "🟡"
+    else:
+        nivel = "Baixa"
+        emoji = "🔴"
+
+    st.metric(
+        f"{emoji} ICII Agregado (Grubel-Lloyd)",
+        f"{icii_agregado:.1f}",
+    )
+
+    st.caption(
+        f"Integração intra-industrial **{nivel.lower()}** "
+        f"entre o Brasil e "
+        f"{'os países BRICS+' if partner_sel == 'Todos' else partner_sel} "
+        f"em {year_sel}."
+    )
+
+    st.subheader("Produtos com Maior ICII")
+
+    icii_top = (
+        icii_df
+        .sort_values("ICII", ascending=False)
+        .head(20)
+    )
+
+    if not icii_top.empty:
+
         fig_icii = px.bar(
-            icii_df,
+            icii_top,
             x="ICII",
             y="cmdDesc",
             orientation="h",
             color="ICII",
             color_continuous_scale="Purples",
             range_x=[0, 100],
-            labels={"cmdDesc": "Produto", "ICII": "ICII (0–100)"},
-            title=f"Comércio Intra-Industrial (ICII) – {year_sel}",
+            labels={
+                "cmdDesc": "Produto",
+                "ICII": "ICII (0–100)"
+            },
+            title=f"Top 20 Produtos com Maior ICII – {year_sel}",
         )
-        fig_icii.update_coloraxes(showscale=False)
-        fig_icii.update_layout(yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig_icii, use_container_width=True)
 
-        avg_icii = icii_df["ICII"].mean()
-        level = "alta" if avg_icii > 50 else "moderada" if avg_icii > 25 else "baixa"
-        st.metric(
-            "ICII Médio (top 20 produtos)",
-            f"{avg_icii:.1f}",
-            help="Média dos produtos com maior ICII"
+        fig_icii.update_coloraxes(showscale=False)
+        fig_icii.update_layout(
+            yaxis={"categoryorder": "total ascending"}
         )
-        st.caption(
-            f"Integração intra-industrial **{level}** do Brasil com "
-            f"{'todos os parceiros BRICS+' if partner_sel == 'Todos' else partner_sel} "
-            f"em {year_sel}."
+
+        st.plotly_chart(
+            fig_icii,
+            use_container_width=True
         )
+
+    st.subheader("Distribuição dos Produtos por Faixa de ICII")
+
+    faixas = pd.cut(
+        icii_df["ICII"],
+        bins=[0, 20, 40, 60, 80, 100],
+        include_lowest=True
+    )
+
+    hist_df = (
+        faixas.value_counts()
+        .sort_index()
+        .reset_index()
+    )
+
+    hist_df.columns = ["Faixa", "Quantidade"]
+
+    fig_hist = px.bar(
+        hist_df,
+        x="Faixa",
+        y="Quantidade",
+        labels={
+            "Faixa": "Faixa de ICII",
+            "Quantidade": "Número de Produtos"
+        },
+        title="Distribuição dos Produtos por Grau de Integração"
+    )
+
+    st.plotly_chart(
+        fig_hist,
+        use_container_width=True
+    )
+
