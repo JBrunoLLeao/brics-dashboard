@@ -660,18 +660,27 @@ elif page == "📊 Indicadores de Competitividade":
     st.subheader("Distribuição dos Produtos por Faixa de ICII")
 
     faixas = pd.cut(
-        icii_df["ICII"],
-        bins=[0, 20, 40, 60, 80, 100],
-        include_lowest=True
-    )
+    icii_df["ICII"],
+    bins=[0,20,40,60,80,100],
+    labels=[
+        "0–20",
+        "20–40",
+        "40–60",
+        "60–80",
+        "80–100"
+    ],
+    include_lowest=True
+)
 
     hist_df = (
-        faixas.value_counts()
-        .sort_index()
-        .reset_index()
-    )
+    faixas.value_counts()
+    .sort_index()
+    .reset_index()
+)
 
     hist_df.columns = ["Faixa", "Quantidade"]
+
+    hist_df["Faixa"] = hist_df["Faixa"].astype(str)
 
     fig_hist = px.bar(
         hist_df,
