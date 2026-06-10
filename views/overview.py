@@ -37,19 +37,15 @@ c3.metric("Relações bilaterais ativas", f"{n_pairs} de 110")
 st.divider()
 
 # Mapa dos membros
-col_map, col_evo = st.columns([1, 1])
+col_map, col_evo = st.columns(2)
 
 with col_map:
     st.subheader("Os 11 membros do BRICS+")
     country_total = (
-        pd.concat(
-            [
-                f.groupby("exporter", observed=True)["value"].sum().rename("v"),
-                f.groupby("importer", observed=True)["value"].sum().rename("v"),
-            ]
-        )
-        .groupby(level=0)
+        f.groupby("exporter", observed=True)["value"]
         .sum()
+        .add(f.groupby("importer", observed=True)["value"].sum(), fill_value=0)
+        .rename("v")
         .rename_axis("iso3")
         .reset_index()
     )
@@ -160,11 +156,9 @@ matrix = (
     f.groupby(["exporter", "importer"], observed=True)["value"]
     .sum()
     .div(1e9)
-    .reset_index()
-    .pivot(index="exporter", columns="importer", values="value")
+    .unstack()
+    .rename(index=names, columns=names)
 )
-matrix.index = [names[i] for i in matrix.index]
-matrix.columns = [names[c] for c in matrix.columns]
 fig_hm = px.imshow(
     matrix,
     color_continuous_scale="Blues",
@@ -188,14 +182,21 @@ with col_c:
 
 with col_d:
     st.subheader("Crescimento médio anual (CAGR)")
-    rows = []
-    for iso in names:
-        s = (
-            f[(f["exporter"] == iso) | (f["importer"] == iso)]
-            .groupby("year", observed=True)["value"]
+    per_country_year = (
+        f.groupby(["exporter", "year"], observed=True)["value"]
+        .sum()
+        .rename_axis(["iso3", "year"])
+        .add(
+            f.groupby(["importer", "year"], observed=True)["value"]
             .sum()
+            .rename_axis(["iso3", "year"]),
+            fill_value=0,
         )
-        rows.append({"país": names[iso], "CAGR (%)": cagr(s)})
+    )
+    rows = [
+        {"país": names[iso], "CAGR (%)": cagr(per_country_year.loc[iso])}
+        for iso in per_country_year.index.get_level_values("iso3").unique()
+    ]
     df_cagr = pd.DataFrame(rows).dropna().sort_values("CAGR (%)")
     fig_cagr = px.bar(
         df_cagr,

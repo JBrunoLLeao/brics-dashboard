@@ -12,17 +12,20 @@ st.caption(
 
 d = data.load()
 fact = d["fact"]
-names = data.name_map()
 years = data.years()
 hs2_labels = data.hs2_label_map()
+members = data.members_pt()
 
 col1, col2, col3, col4 = st.columns(4)
-exp_sel = col1.selectbox("País exportador", data.members_pt(), index=data.members_pt().index("Brasil"))
-imp_options = [c for c in data.members_pt() if c != exp_sel]
+exp_sel = col1.selectbox("País exportador", members, index=members.index("Brasil"))
+imp_options = [c for c in members if c != exp_sel]
 imp_sel = col2.selectbox("País importador", imp_options, index=imp_options.index("China") if "China" in imp_options else 0)
 year_range = col3.slider("Período", years[0], years[-1], (years[0], years[-1]))
-chapters = ["Todos os setores"] + [hs2_labels[h] for h in sorted(hs2_labels)]
-chapter_sel = col4.selectbox("Produto/setor (capítulo HS2)", chapters)
+chapter_sel = col4.selectbox(
+    "Produto/setor (capítulo HS2)",
+    ["ALL"] + sorted(hs2_labels),
+    format_func=lambda c: "Todos os setores" if c == "ALL" else hs2_labels[c],
+)
 prod_col, prod_labels, level_sel = data.hs_level_selector()
 
 iso_a, iso_b = data.iso_of(exp_sel), data.iso_of(imp_sel)
@@ -35,8 +38,8 @@ pair = fact[
         | ((fact["exporter"] == iso_b) & (fact["importer"] == iso_a))
     )
 ]
-if chapter_sel != "Todos os setores":
-    pair = pair[pair["hs2"] == chapter_sel.split(" - ")[0]]
+if chapter_sel != "ALL":
+    pair = pair[pair["hs2"] == chapter_sel]
 
 if pair.empty:
     st.warning("Sem dados para essa seleção.")
@@ -65,12 +68,12 @@ st.caption(
 )
 
 # Evolução temporal nos dois sentidos
+label_ab = f"{exp_sel} → {imp_sel}"
+label_ba = f"{imp_sel} → {exp_sel}"
 serie = (
     pair.groupby(["year", "exporter"], observed=True)["value"].sum().reset_index()
 )
-serie["sentido"] = serie["exporter"].map(
-    {iso_a: f"{exp_sel} → {imp_sel}", iso_b: f"{imp_sel} → {exp_sel}"}
-)
+serie["sentido"] = serie["exporter"].map({iso_a: label_ab, iso_b: label_ba})
 serie["v_bi"] = serie["value"] / 1e9
 fig_serie = px.line(
     serie,
@@ -78,7 +81,10 @@ fig_serie = px.line(
     y="v_bi",
     color="sentido",
     markers=True,
-    color_discrete_sequence=["#2ecc71", "#e74c3c"],
+    color_discrete_map={
+        label_ab: data.FLOW_COLORS["Exportações"],
+        label_ba: data.FLOW_COLORS["Importações"],
+    },
     labels={"year": "Ano", "v_bi": "US$ bilhões", "sentido": ""},
     title=f"{exp_sel} ↔ {imp_sel}: evolução temporal",
 )
@@ -90,16 +96,11 @@ col_a, col_b = st.columns(2)
 
 
 def top_products(frame: pd.DataFrame, n: int = 15) -> pd.DataFrame:
-    out = (
-        frame.groupby(prod_col, observed=True)["value"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(n)
-        .reset_index()
-    )
-    out["produto"] = out[prod_col].astype(str).map(prod_labels).str.slice(0, 55)
+    s = frame.groupby(prod_col, observed=True)["value"].sum()
+    out = s[s > 0].sort_values(ascending=False).head(n).reset_index()
+    out["produto"] = data.product_label(out[prod_col], prod_labels)
     out["v_mi"] = out["value"] / 1e6
-    return out[out["value"] > 0]
+    return out
 
 
 with col_a:
@@ -138,7 +139,7 @@ with col_b:
 
 # Evolução dos principais produtos do sentido selecionado
 st.subheader(f"Evolução dos principais produtos ({exp_sel} → {imp_sel})")
-top5 = top_products(ab, n=5)[prod_col].tolist()
+top5 = prod_ab[prod_col].head(5).tolist()
 if top5:
     df_top = (
         ab[ab[prod_col].isin(top5)]
@@ -146,7 +147,7 @@ if top5:
         .sum()
         .reset_index()
     )
-    df_top["produto"] = df_top[prod_col].astype(str).map(prod_labels).str.slice(0, 45)
+    df_top["produto"] = data.product_label(df_top[prod_col], prod_labels)
     df_top["v_mi"] = df_top["value"] / 1e6
     fig_area = px.area(
         df_top,

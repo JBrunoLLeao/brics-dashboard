@@ -15,8 +15,10 @@ d = data.load()
 fact = d["fact"]
 names = data.name_map()
 years = data.years()
+members = data.members_pt()
+
 col1, col2, col3 = st.columns(3)
-country_sel = col1.selectbox("País", data.members_pt(), index=data.members_pt().index("Brasil"))
+country_sel = col1.selectbox("País", members, index=members.index("Brasil"))
 flow_sel = col2.selectbox("Fluxo", ["Exportações", "Importações"])
 year_range = col3.slider("Período", years[0], years[-1], (years[0], years[-1]))
 prod_col, labels, level_sel = data.hs_level_selector()
@@ -41,7 +43,7 @@ products = (
 products = products[products > 0]
 top = products.head(20).reset_index()
 top["produto"] = top[prod_col].astype(str).map(labels)
-top["rótulo"] = top["produto"].str.slice(0, 60)
+top["rótulo"] = data.product_label(top[prod_col], labels)
 top["v_bi"] = top["value"] / 1e9
 
 col_a, col_b = st.columns(2)
@@ -112,7 +114,7 @@ df_sun = (
 )
 df_sun = df_sun[df_sun["value"] > 0]
 df_sun["parceiro"] = df_sun[partner_col].map(names)
-df_sun["produto"] = df_sun[prod_col].astype(str).map(labels).str.slice(0, 45)
+df_sun["produto"] = data.product_label(df_sun[prod_col], labels)
 fig_sun = px.sunburst(
     df_sun,
     path=["parceiro", "produto"],
@@ -147,9 +149,7 @@ st.plotly_chart(fig_tech, width="stretch")
 
 # Comparação de pautas entre dois países
 st.subheader("⚖️ Comparação de pautas")
-other_sel = st.selectbox(
-    "Comparar com", [c for c in data.members_pt() if c != country_sel]
-)
+other_sel = st.selectbox("Comparar com", [c for c in members if c != country_sel])
 iso_b = data.iso_of(other_sel)
 fb = fact[
     (fact[side] == iso_b)
