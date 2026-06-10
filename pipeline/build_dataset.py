@@ -10,7 +10,7 @@ Outputs (data/):
   world_exports.parquet   year, exporter, hs6, value   (BRICS+ exporter -> World)
   world_imports.parquet   year, importer, hs6, value   (World -> BRICS+ importer)
   world_totals.parquet    year, hs6, value             (all exporters -> World)
-  dim_product.parquet     hs6, hs2, desc_en
+  dim_product.parquet     hs6, desc_en
   dim_country.parquet     iso3, name_pt, lat, lon, accession
 """
 
@@ -58,9 +58,7 @@ def build_dim_product(zf: zipfile.ZipFile) -> None:
     with zf.open("product_codes_HS12_V202601.csv") as f:
         prod = pd.read_csv(f, dtype={"code": str})
     prod["code"] = prod["code"].str.zfill(6)
-    out = pd.DataFrame(
-        {"hs6": prod["code"], "hs2": prod["code"].str[:2], "desc_en": prod["description"]}
-    )
+    out = pd.DataFrame({"hs6": prod["code"], "desc_en": prod["description"]})
     out.to_parquet(DATA / "dim_product.parquet", index=False)
     print(f"dim_product.parquet: {len(out)} HS6 codes")
 
