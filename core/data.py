@@ -41,7 +41,7 @@ def load() -> dict[str, pd.DataFrame]:
     for col in ("exporter", "importer", "hs6", "hs2", "lall_code", "tier"):
         fact[col] = fact[col].astype("category")
 
-    return {
+    out = {
         "fact": fact,
         "world_exports": pd.read_parquet(DATA / "world_exports.parquet"),
         "world_imports": pd.read_parquet(DATA / "world_imports.parquet"),
@@ -52,35 +52,61 @@ def load() -> dict[str, pd.DataFrame]:
         "dim_lall": dim_lall,
         "crosscheck": pd.read_parquet(DATA / "crosscheck.parquet"),
     }
+    for key in ("world_exports", "world_imports", "world_totals"):
+        out[key]["hs2"] = out[key]["hs6"].str[:2]
+    return out
+
+
+@st.cache_data
+def _lookups() -> dict:
+    """Small lookup tables, cached apart from load() so helper calls
+    never pay a copy of the full frame dict."""
+    d = load()
+    dim = d["dim_country"]
+    name = dict(zip(dim["iso3"], dim["name_pt"]))
+    return {
+        "name": name,
+        "iso": {v: k for k, v in name.items()},
+        "hs2": {
+            h: f"{h} - {t}" for h, t in zip(d["dim_hs2"]["hs2"], d["dim_hs2"]["desc_en"])
+        },
+        "hs6": {
+            h: f"{h} - {t}"
+            for h, t in zip(d["dim_product"]["hs6"], d["dim_product"]["desc_en"])
+        },
+        "years": sorted(d["fact"]["year"].unique().tolist()),
+        "members": sorted(name.values()),
+    }
 
 
 def name_map() -> dict[str, str]:
-    dim = load()["dim_country"]
-    return dict(zip(dim["iso3"], dim["name_pt"]))
+    return _lookups()["name"]
 
 
 def hs2_label_map() -> dict[str, str]:
-    dim = load()["dim_hs2"]
-    return {h: f"{h} - {d}" for h, d in zip(dim["hs2"], dim["desc_en"])}
+    return _lookups()["hs2"]
 
 
 def hs6_label_map() -> dict[str, str]:
-    dim = load()["dim_product"]
-    return {h: f"{h} - {d}" for h, d in zip(dim["hs6"], dim["desc_en"])}
+    return _lookups()["hs6"]
 
 
 def years() -> list[int]:
-    return sorted(load()["fact"]["year"].unique().tolist())
+    return _lookups()["years"]
 
 
 def members_pt() -> list[str]:
     """Member names sorted alphabetically (PT)."""
-    return sorted(name_map().values())
+    return _lookups()["members"]
 
 
 def iso_of(name_pt: str) -> str:
-    inv = {v: k for k, v in name_map().items()}
-    return inv[name_pt]
+    return _lookups()["iso"][name_pt]
+
+
+def product_label(codes: pd.Series, labels: dict[str, str], width: int = 55) -> pd.Series:
+    """Map product codes to their display label, truncated to width."""
+    return codes.astype(str).map(labels).str.slice(0, width)
 
 
 def hs_level_selector() -> tuple[str, dict[str, str], str]:

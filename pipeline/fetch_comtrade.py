@@ -75,13 +75,11 @@ def fetch_totals() -> None:
         {
             "year": raw["period"].astype(int),
             "reporter_iso3": raw["reporterCode"].map(M49_TO_ISO3),
-            "partner_code": raw["partnerCode"],
+            "partner_iso3": raw["partnerCode"].map(M49_TO_ISO3).fillna("WLD"),
             "flow": raw["flowCode"],
             "comtrade_value": pd.to_numeric(raw["primaryValue"]),
         }
     )
-    out["partner_iso3"] = out["partner_code"].map(M49_TO_ISO3).fillna("WLD")
-    out = out.drop(columns="partner_code")
     out.to_parquet(DATA / "crosscheck.parquet", index=False)
     print(f"crosscheck.parquet: {len(out)} rows, years {out['year'].min()}-{out['year'].max()}")
 

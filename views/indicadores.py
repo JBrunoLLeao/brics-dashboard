@@ -12,9 +12,11 @@ fact = d["fact"]
 names = data.name_map()
 years = data.years()
 
+members = data.members_pt()
+
 col1, col2, col3 = st.columns(3)
-country_sel = col1.selectbox("País analisado (i)", data.members_pt(), index=data.members_pt().index("Brasil"))
-market_opts = ["Bloco BRICS+"] + [c for c in data.members_pt() if c != country_sel]
+country_sel = col1.selectbox("País analisado (i)", members, index=members.index("Brasil"))
+market_opts = ["Bloco BRICS+"] + [c for c in members if c != country_sel]
 market_sel = col2.selectbox("Mercado/parceiro (k)", market_opts)
 year_sel = col3.selectbox("Ano de referência", years[::-1])
 prod_col, prod_labels, level_sel = data.hs_level_selector()
@@ -41,12 +43,6 @@ def by_level(frame: pd.DataFrame) -> pd.Series:
     return s[s > 0]
 
 
-def world_by_level(frame: pd.DataFrame) -> pd.Series:
-    if prod_col == "hs2":
-        frame = frame.assign(hs2=frame["hs6"].str[:2])
-    return frame.groupby(prod_col)["value"].sum()
-
-
 # ---------- Market Share ----------
 st.subheader("📌 Market Share (MS)")
 st.latex(r"MS_{ik} = \frac{X_{ik}}{M_k}")
@@ -58,12 +54,12 @@ st.caption(
 
 x_ik = by_level(fy[(fy["exporter"] == iso) & (fy["importer"].isin(market_isos))])
 wi = d["world_imports"]
-m_k = world_by_level(wi[(wi["year"] == year_sel) & (wi["importer"].isin(market_isos))])
+m_k = by_level(wi[(wi["year"] == year_sel) & (wi["importer"].isin(market_isos))])
 
 ms = market_share(x_ik, m_k).dropna().sort_values(ascending=False)
 ms_df = ms.head(15).reset_index()
 ms_df.columns = ["code", "MS (%)"]
-ms_df["produto"] = ms_df["code"].astype(str).map(prod_labels).str.slice(0, 55)
+ms_df["produto"] = data.product_label(ms_df["code"], prod_labels)
 ms_df["exportado"] = ms_df["code"].astype(str).map(x_ik) / 1e6
 
 if ms_df.empty:
@@ -101,16 +97,16 @@ st.caption(
 )
 
 we = d["world_exports"]
-x_ip = world_by_level(we[(we["year"] == year_sel) & (we["exporter"] == iso)])
+x_ip = by_level(we[(we["year"] == year_sel) & (we["exporter"] == iso)])
 wt = d["world_totals"]
-w_p = world_by_level(wt[wt["year"] == year_sel])
+w_p = by_level(wt[wt["year"] == year_sel])
 
 vcr = rca(x_ip, w_p).dropna()
 relevant = x_ip[x_ip / x_ip.sum() >= 0.005]  # produtos com >=0,5% da pauta
-vcr_top = vcr[vcr.index.isin(relevant.index)].sort_values(ascending=False).head(15)
-vcr_df = vcr_top.reset_index()
+vcr_rel = vcr[vcr.index.isin(relevant.index)]
+vcr_df = vcr_rel.sort_values(ascending=False).head(15).reset_index()
 vcr_df.columns = ["code", "VCR"]
-vcr_df["produto"] = vcr_df["code"].astype(str).map(prod_labels).str.slice(0, 55)
+vcr_df["produto"] = data.product_label(vcr_df["code"], prod_labels)
 vcr_df["status"] = vcr_df["VCR"].apply(
     lambda v: "Com vantagem (VCR > 1)" if v >= 1 else "Sem vantagem (VCR < 1)"
 )
@@ -132,7 +128,7 @@ fig_vcr.add_vline(x=1, line_dash="dash", line_color="gray", annotation_text="VCR
 fig_vcr.update_layout(yaxis={"categoryorder": "total ascending"}, height=480)
 st.plotly_chart(fig_vcr, width="stretch")
 
-n_adv = int((vcr[vcr.index.isin(relevant.index)] > 1).sum())
+n_adv = int((vcr_rel > 1).sum())
 st.caption(
     f"Interpretação: dos {len(relevant)} produtos com peso relevante na pauta de "
     f"{country_sel}, **{n_adv}** apresentam vantagem comparativa revelada em {year_sel}. "
@@ -183,7 +179,7 @@ col_a, col_b = st.columns(2)
 with col_a:
     top_df = icii_top.sort_values(ascending=False).head(15).reset_index()
     top_df.columns = ["code", "ICII"]
-    top_df["produto"] = top_df["code"].astype(str).map(prod_labels).str.slice(0, 50)
+    top_df["produto"] = data.product_label(top_df["code"], prod_labels)
     fig_icii = px.bar(
         top_df,
         x="ICII",
