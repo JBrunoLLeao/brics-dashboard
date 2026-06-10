@@ -1,0 +1,12 @@
+lall_code,label_en,label_pt,tier
+LDC01,Primary products,Produtos primários,Primário
+LDC02,Resource-based manufactures: agro-based,Manufaturas baseadas em recursos: agroindustriais,Baseado em recursos
+LDC03,Resource-based manufactures: other,Manufaturas baseadas em recursos: outras,Baseado em recursos
+LDC04,"Low technology manufactures: textile, garment and footwear","Baixa tecnologia: têxteis, vestuário e calçados",Baixa tecnologia
+LDC05,Low technology manufactures: other products,Baixa tecnologia: outros produtos,Baixa tecnologia
+LDC06,Medium technology manufactures: automotive,Média tecnologia: automotiva,Média tecnologia
+LDC07,Medium technology manufactures: process,Média tecnologia: processos,Média tecnologia
+LDC08,Medium technology manufactures: engineering,Média tecnologia: engenharia,Média tecnologia
+LDC09,High technology manufactures: electronic and electrical,Alta tecnologia: eletrônica e elétrica,Alta tecnologia
+LDC10,High technology manufactures: other,Alta tecnologia: outras,Alta tecnologia
+LDC99,Unclassified products,Produtos não classificados,Não classificado
