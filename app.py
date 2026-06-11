@@ -22,6 +22,7 @@ nav = st.navigation(
         st.Page("views/pauta.py", title="Estrutura da Pauta", icon="📦"),
         st.Page("views/bilateral.py", title="Fluxos Bilaterais", icon="🔄"),
         st.Page("views/indicadores.py", title="Indicadores de Competitividade", icon="📊"),
+        st.Page("views/reconciliacao.py", title="Reconciliação BACI × Comtrade", icon="🔎"),
         st.Page("views/metodologia.py", title="Metodologia e Fontes", icon="📚"),
     ]
 )

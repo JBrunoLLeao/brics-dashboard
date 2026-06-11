@@ -40,6 +40,20 @@ python pipeline/build_tech_map.py   # classificação tecnológica (Lall)
 python pipeline/build_dataset.py    # parquet finais em data/
 ```
 
+`build_tech_map.py` precisa de dois arquivos de origem baixados **manualmente**
+para `pipeline/cache/` (esse diretório é ignorado pelo git e não vem no
+repositório):
+
+- `lall_hierarchy.pdf` — UNCTAD, *"SITC rev.3 products, by technological
+  categories (Lall (2000))"*.
+- `JobID-84_Concordance_H4_to_S3.CSV` — concordância WITS, HS 2012 (H4) 6
+  dígitos → SITC rev.3 (gerada como um job de concordância no site do WITS).
+
+Sem eles o script falha com `No such file or directory`. Também requer o
+utilitário `pdftotext` (pacote `poppler-utils`) no PATH. Os lookups que ele
+gera (`data/lookup_hs6_lall.csv` e `data/dim_lall.csv`) já estão versionados,
+então só é preciso reexecutá-lo para reconstruir a classificação do zero.
+
 ## Execução local
 
 ```sh
